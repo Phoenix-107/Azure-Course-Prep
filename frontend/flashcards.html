@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Azure Scholar AZ-900 | Flashcards Coach</title>
+  <meta name="description" content="Master Microsoft Azure Fundamentals (AZ-900) with spaced repetition flashcards powered by the SM-2 algorithm.">
+  
+  <!-- Modern System Typography & Core Styles -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+  <!-- Radiant Header with Azure Deep-to-Electric Gradient & Geometric Accents -->
+  <header class="app-header">
+    <div class="header-bg-decor">
+      <div class="decor-box decor-box-1"></div>
+      <div class="decor-box decor-box-2"></div>
+      <div class="decor-box decor-box-3"></div>
+    </div>
+    
+    <div class="header-container">
+      <div class="brand-wrapper">
+        <div class="brand-icon">
+          <!-- Azure Cloud Monogram Icon -->
+          <svg viewBox="0 0 24 24">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.6.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>
+            Azure Scholar <span class="brand-badge">AZ-900</span>
+          </h1>
+          <p>Flashcards Coach & Spaced Repetition</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" aria-label="Main Navigation">
+        <a href="/dashboard" class="nav-link" id="nav-dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+            <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+            <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+            <rect width="7" height="5" x="3" y="16" rx="1"></rect>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/quiz" class="nav-link" id="nav-quiz">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"></path>
+            <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"></path>
+          </svg>
+          Smart Quiz
+        </a>
+        <a href="/flashcards" class="nav-link active" id="nav-flashcards">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+            <path d="M3 9h18"></path>
+            <path d="M9 21V9"></path>
+          </svg>
+          Flashcards
+        </a>
+      </nav>
+
+      <!-- Persistent Scholar ID Display -->
+      <div class="scholar-badge" id="scholar-identity-tag" title="Your persistent Scholar UUID in localStorage">
+        <span class="scholar-status-dot"></span>
+        <span id="scholar-id-text">Loading...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Container -->
+  <main class="page-container">
+    <div class="flashcards-container">
+
+      <!-- Friendly Error Notification Banner -->
+      <div id="fc-error-banner" class="fc-alert fc-alert-error" style="display: none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span id="fc-error-message">Unable to reach the server. Please try again.</span>
+      </div>
+
+      <!-- Daily Plan Bar & Topic Filter -->
+      <section class="fc-plan-bar" id="fc-plan-bar">
+        <div class="fc-plan-info">
+          <div class="fc-plan-icon" aria-hidden="true">⚡</div>
+          <div>
+            <div class="fc-plan-headline" id="fc-headline">Loading cards...</div>
+            <div class="fc-plan-subline" id="fc-subline">Spaced Repetition SM-2 Scheduled Session</div>
+          </div>
+        </div>
+        <div class="fc-plan-filter">
+          <select id="fc-topic-select" class="fc-filter-select" aria-label="Filter cards by topic">
+            <option value="all">All Topics</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           VIEW 1: ACTIVE FLASHCARD REVIEW LOOP
+           =================================================================== -->
+      <section id="view-review" style="display: none;">
+        <!-- Progress Bar & Card Meta -->
+        <div class="fc-progress-wrap">
+          <div class="fc-progress-meta">
+            <span id="fc-progress-text">Card 1 of 1</span>
+            <span id="fc-status-badge" class="fc-badge-due">Due</span>
+          </div>
+          <div class="fc-progress-bar-bg">
+            <div class="fc-progress-bar-fill" id="fc-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- 3D Flip Card Container -->
+        <div class="fc-stage">
+          <div class="fc-card" id="fc-card-element" tabindex="0" role="button" aria-label="Flashcard. Click or press space to flip.">
+            <!-- Front Face -->
+            <div class="fc-face fc-face-front">
+              <div class="fc-tag-line">
+                <span class="fc-topic-tag" id="fc-front-topic">Azure Concepts</span>
+                <span class="fc-type-pill" id="fc-front-type">Basic Fact</span>
+              </div>
+              <div class="fc-content" id="fc-front-text">
+                Card prompt loading...
+              </div>
+              <div class="fc-face-footer">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                  <path d="M21 3v5h-5"></path>
+                </svg>
+                <span>Click card or press <kbd class="fc-kbd">Space</kbd> to reveal answer</span>
+              </div>
+            </div>
+
+            <!-- Back Face -->
+            <div class="fc-face fc-face-back">
+              <div class="fc-tag-line">
+                <span class="fc-topic-tag" id="fc-back-topic">Azure Concepts</span>
+                <span class="fc-type-pill" id="fc-back-type">Answer</span>
+              </div>
+              <div class="fc-content" id="fc-back-text">
+                Card answer loading...
+              </div>
+              <div class="fc-hint-box" id="fc-hint-container" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span id="fc-hint-text"></span>
+              </div>
+              <div class="fc-face-footer">
+                <span>Select your recall accuracy below:</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controls Area -->
+        <div class="fc-controls-wrap">
+          <!-- Button State 1: Before Flip (Show Answer) -->
+          <div id="fc-controls-unflipped">
+            <button class="fc-btn-show-answer" id="btn-show-answer">
+              <span>Show Answer</span>
+              <kbd class="fc-kbd">[Space]</kbd>
+            </button>
+          </div>
+
+          <!-- Button State 2: After Flip (4 SM-2 Rating Buttons) -->
+          <div id="fc-controls-flipped" style="display: none;">
+            <div class="fc-rating-cluster">
+              <!-- Rating 0: Again -->
+              <button class="fc-rate-btn fc-rate-again" id="btn-rate-0" data-rating="0">
+                <span class="fc-rate-name">Again</span>
+                <span class="fc-rate-interval" id="interval-label-0">1d</span>
+                <span class="fc-key-hint">Press 1</span>
+              </button>
+              <!-- Rating 1: Hard -->
+              <button class="fc-rate-btn fc-rate-hard" id="btn-rate-1" data-rating="1">
+                <span class="fc-rate-name">Hard</span>
+                <span class="fc-rate-interval" id="interval-label-1">1d</span>
+                <span class="fc-key-hint">Press 2</span>
+              </button>
+              <!-- Rating 2: Good -->
+              <button class="fc-rate-btn fc-rate-good" id="btn-rate-2" data-rating="2">
+                <span class="fc-rate-name">Good</span>
+                <span class="fc-rate-interval" id="interval-label-2">3d</span>
+                <span class="fc-key-hint">Press 3</span>
+              </button>
+              <!-- Rating 3: Easy -->
+              <button class="fc-rate-btn fc-rate-easy" id="btn-rate-3" data-rating="3">
+                <span class="fc-rate-name">Easy</span>
+                <span class="fc-rate-interval" id="interval-label-3">4d</span>
+                <span class="fc-key-hint">Press 4</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Keyboard Legend -->
+          <div class="fc-keyboard-hints">
+            Shortcuts: <kbd class="fc-kbd">Space</kbd> Flip &middot; <kbd class="fc-kbd">1</kbd> Again &middot; <kbd class="fc-kbd">2</kbd> Hard &middot; <kbd class="fc-kbd">3</kbd> Good &middot; <kbd class="fc-kbd">4</kbd> Easy
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           VIEW 2: SUMMARY SCREEN AT SESSION COMPLETION
+           =================================================================== -->
+      <section id="view-summary" class="fc-summary-card" style="display: none;">
+        <div class="fc-summary-icon" aria-hidden="true">&#x1F389;</div>
+        <h2 class="fc-summary-title">Session Complete!</h2>
+        <p class="fc-summary-subtitle">Great work! You've reinforced key Azure fundamentals into long-term memory.</p>
+
+        <div class="fc-summary-grid">
+          <div class="fc-stat-box">
+            <div class="fc-stat-val" id="summary-cards-done">0</div>
+            <div class="fc-stat-lbl">Cards Done</div>
+          </div>
+          <div class="fc-stat-box">
+            <div class="fc-stat-val" id="summary-accuracy">100%</div>
+            <div class="fc-stat-lbl">Accuracy</div>
+          </div>
+          <div class="fc-stat-box">
+            <div class="fc-stat-val" id="summary-tomorrow-due">0</div>
+            <div class="fc-stat-lbl">Tomorrow's Due</div>
+          </div>
+          <div class="fc-stat-box">
+            <div class="fc-stat-val" id="summary-streak">1</div>
+            <div class="fc-stat-lbl">Day Streak 🔥</div>
+          </div>
+        </div>
+
+        <div class="fc-summary-actions">
+          <button class="btn btn-primary" id="btn-review-again">Review Again</button>
+          <a href="/quiz" class="btn btn-secondary">Go to Smart Quiz</a>
+          <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           VIEW 3: EMPTY STATE (ALL CAUGHT UP)
+           =================================================================== -->
+      <section id="view-empty" class="fc-empty-card" style="display: none;">
+        <div class="fc-empty-icon" aria-hidden="true">&#x2728;</div>
+        <h2 class="fc-summary-title">All caught up for today!</h2>
+        <p class="fc-summary-subtitle">You have reviewed all due cards. Take a well-deserved break or practice with adaptive quizzes to discover new cards.</p>
+
+        <div class="fc-summary-actions">
+          <a href="/quiz" class="btn btn-primary">Start a Smart Quiz</a>
+          <a href="/dashboard" class="btn btn-secondary">View Readiness Dashboard</a>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Client Application Logic Module -->
+  <script type="module" src="/static/js/cards.js"></script>
+</body>
+</html>

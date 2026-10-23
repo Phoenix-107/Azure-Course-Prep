@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.db import get_db_connection, init_db
+from backend.cards_router import router as cards_router
+from backend import srs
 from backend.readiness import (
     build_day_plan,
     choose_mode,
@@ -45,6 +47,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register Flashcards Coach router
+app.include_router(cards_router)
 
 # In-memory session tracking for randomized question option orders
 # Key: (user_id, question_id) -> {"shuffled_to_orig": list[int], "orig_to_shuffled": list[int], "timestamp": float}
@@ -438,6 +443,14 @@ def submit_attempt(payload: AttemptRequest):
         )
         conn.commit()
 
+        # Boost or create a spaced repetition flashcard on wrong answer
+        if not is_correct:
+            try:
+                srs.boost_card_for_question(conn, payload.question_id, payload.user_id)
+            except Exception:
+                # Failure here must never break quiz answering
+                pass
+
         return AttemptResponse(
             correct=is_correct,
             correct_index=client_correct_index,
@@ -588,3 +601,8 @@ def serve_dashboard():
 def serve_quiz():
     """Direct route for smart quiz builder."""
     return FileResponse(FRONTEND_DIR / "quiz.html")
+
+@app.get("/flashcards")
+def serve_flashcards():
+    """Direct route for flashcards coach."""
+    return FileResponse(FRONTEND_DIR / "flashcards.html")

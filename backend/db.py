@@ -80,11 +80,53 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_attempts_user_topic ON attempts(user_id, topic_id);
     """)
 
-    # 5. Exam, plan, and snapshot tables for the readiness tracker
+    # 5. Flashcards Coach tables
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS cards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        topic_id TEXT REFERENCES topics(id),
+        front TEXT NOT NULL UNIQUE,
+        back TEXT NOT NULL,
+        type TEXT DEFAULT 'basic',
+        hint TEXT,
+        source_chunk_id INTEGER,
+        source_question_id INTEGER
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS card_state (
+        card_id INTEGER REFERENCES cards(id),
+        user_id TEXT NOT NULL,
+        ease REAL DEFAULT 2.5,
+        interval INTEGER DEFAULT 0,
+        repetitions INTEGER DEFAULT 0,
+        due_date TEXT NOT NULL,
+        last_reviewed TEXT,
+        lapses INTEGER DEFAULT 0,
+        PRIMARY KEY (card_id, user_id)
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS review_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_id INTEGER,
+        user_id TEXT,
+        rating INTEGER,
+        reviewed_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_state_due ON card_state(user_id, due_date);
+    """)
+
+    # Existing exams schema is shared by the readiness tracker.
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT NOT NULL UNIQUE,
+        user_id TEXT NOT NULL,
         course TEXT,
         exam_date TEXT NOT NULL,
         target_score INTEGER DEFAULT 85,

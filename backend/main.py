@@ -18,6 +18,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.db import get_db_connection, init_db
+from backend.readiness import (
+    build_day_plan,
+    choose_mode,
+    coach_note,
+    overall,
+    pressure,
+    topic_readiness,
+)
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -89,6 +97,170 @@ def on_startup():
 
 
 # --- API Routes ---
+
+@app.post("/api/exams")
+def save_exam(
+    user_id: str = Query(..., description="Unique scholar ID"),
+    course: Optional[str] = Query(None),
+    exam_date: str = Query(..., description="YYYY-MM-DD"),
+    target_score: int = Query(85, ge=0, le=100),
+    daily_minutes: int = Query(45, ge=1, le=600),
+):
+    """Persist exam configuration and close the loop for the readiness tracker."""
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            """
+            INSERT INTO exams (user_id, course, exam_date, target_score, daily_minutes)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                course = excluded.course,
+                exam_date = excluded.exam_date,
+                target_score = excluded.target_score,
+                daily_minutes = excluded.daily_minutes
+            """,
+            (user_id, course, exam_date, target_score, daily_minutes),
+        )
+        conn.commit()
+        return {
+            "user_id": user_id,
+            "course": course,
+            "exam_date": exam_date,
+            "target_score": target_score,
+            "daily_minutes": daily_minutes,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/readiness")
+def get_readiness(user_id: str = Query(..., description="Unique scholar ID")):
+    """Return readiness summary and suggested study mode using the rule-based formulas."""
+    conn = get_db_connection()
+    try:
+        topics_rows = conn.execute(
+            """
+            SELECT t.id, t.name, t.weight, COUNT(q.id) AS question_count
+            FROM topics t
+            LEFT JOIN questions q ON t.id = q.topic_id
+            GROUP BY t.id, t.name, t.weight
+            ORDER BY t.id
+            """
+        ).fetchall()
+
+        attempts_rows = conn.execute(
+            """
+            SELECT a.question_id, a.topic_id, a.correct, a.answered_at
+            FROM attempts a
+            WHERE a.user_id = ?
+            ORDER BY a.answered_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+        topic_attempts_map = defaultdict(list)
+        for attempt in attempts_rows:
+            topic_attempts_map[attempt["topic_id"]].append(attempt["correct"])
+
+        topic_metrics = []
+        for topic in topics_rows:
+            topic_id = topic["id"]
+            attempts = topic_attempts_map.get(topic_id, [])
+            q_count = int(topic["question_count"])
+            if attempts:
+                accuracy = sum(attempts) / len(attempts)
+                unique_questions = len({a["question_id"] for a in attempts_rows if a["topic_id"] == topic_id})
+                coverage = unique_questions / q_count if q_count else 0.0
+                recency = 1.0
+                readiness = topic_readiness(accuracy, min(1.0, coverage), recency)
+            else:
+                readiness = None
+            topic_metrics.append({
+                "id": topic_id,
+                "name": topic["name"],
+                "readiness": readiness,
+                "weight": float(topic["weight"]),
+                "accuracy": round((sum(attempts) / len(attempts) * 100), 1) if attempts else 0.0,
+                "attempts": len(attempts),
+            })
+
+        days_left = 0
+        exam_row = conn.execute(
+            "SELECT exam_date, daily_minutes, target_score FROM exams WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if exam_row:
+            from datetime import date
+            try:
+                exam_date = date.fromisoformat(exam_row["exam_date"])
+                days_left = max(0, (exam_date - date.today()).days)
+            except ValueError:
+                days_left = 0
+
+        overall_score = overall([
+            {"readiness": entry["readiness"], "weight": entry["weight"]}
+            for entry in topic_metrics if entry["readiness"] is not None
+        ])
+        if overall_score is None:
+            overall_score = 0.0
+
+        pressure_score = pressure(
+            [{"readiness": entry["readiness"], "weight": entry["weight"]} for entry in topic_metrics],
+            days_left,
+            exam_row["daily_minutes"] if exam_row else 45,
+        )
+        mode = choose_mode(pressure_score, bool(attempts_rows))
+        weakest = sorted(topic_metrics, key=lambda t: (t["readiness"] if t["readiness"] is not None else 100, t["accuracy"]))
+        weakest_name = weakest[0]["name"] if weakest else "your study plan"
+
+        return {
+            "overall": round(overall_score, 1),
+            "days_left": days_left,
+            "mode": mode,
+            "delta_7d": 0.0,
+            "topics": [
+                {"id": item["id"], "name": item["name"], "readiness": item["readiness"]}
+                for item in topic_metrics
+            ],
+            "coach_note": coach_note(mode, days_left, overall_score, [weakest_name])
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/plan/today")
+def get_plan_today(user_id: str = Query(..., description="Unique scholar ID")):
+    """Return a simple adaptive plan matching the readiness tracker design."""
+    conn = get_db_connection()
+    try:
+        readiness = get_readiness(user_id=user_id)
+        exam_row = conn.execute(
+            "SELECT exam_date, daily_minutes FROM exams WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+
+        daily_minutes = exam_row["daily_minutes"] if exam_row else 45
+        topics = readiness["topics"]
+        days_left = readiness["days_left"]
+        mode = readiness["mode"]
+        due_cards = 0
+        plan = build_day_plan(
+            [{"id": t["id"], "readiness": t["readiness"], "weight": 1.0} for t in topics],
+            daily_minutes,
+            mode,
+            due_cards,
+            days_left,
+        )
+
+        return {
+            "mode": mode,
+            "minutes_total": sum(item["minutes"] for item in plan),
+            "items": plan,
+            "coach_note": readiness["coach_note"],
+        }
+    finally:
+        conn.close()
+
 
 @app.get("/api/topics", response_model=List[TopicOut])
 def get_topics():
@@ -312,8 +484,7 @@ def get_dashboard_stats(user_id: str = Query(..., description="Unique scholar ID
             topic_attempts_map[a["topic_id"]].append(a["correct"])
 
         topics_breakdown = []
-        weighted_readiness_sum = 0.0
-        total_weight_sum = 0.0
+        readiness_entries = []
 
         for t in topics_rows:
             tid = t["id"]
@@ -333,17 +504,18 @@ def get_dashboard_stats(user_id: str = Query(..., description="Unique scholar ID
 
             coverage = (unique_attempted / q_count) if q_count > 0 else 0.0
 
-            # Topic Readiness Formula:
-            # 70% Accuracy + 30% Question Bank Coverage
-            # If no attempts yet, readiness is 0.0
+            # Use rule-based readiness formula aligned with the design doc.
+            # Only topics with attempts are considered known; otherwise they contribute
+            # as unknown and are excluded from the weighted average.
             if t_count > 0:
-                t_readiness = round(min(100.0, (t_acc * 0.7) + (coverage * 30.0)), 1)
+                quiz_acc = t_acc / 100.0
+                card_mastery = min(1.0, coverage)
+                recency = 1.0 if t_count > 0 else 0.0
+                t_readiness = topic_readiness(quiz_acc, card_mastery, recency)
             else:
-                t_readiness = 0.0
+                t_readiness = None
 
-            weighted_readiness_sum += t_readiness * weight
-            total_weight_sum += weight
-
+            readiness_entries.append({"id": tid, "readiness": t_readiness, "weight": weight})
             topics_breakdown.append({
                 "id": tid,
                 "name": name,
@@ -353,11 +525,13 @@ def get_dashboard_stats(user_id: str = Query(..., description="Unique scholar ID
                 "correct": t_correct,
                 "accuracy": t_acc,
                 "coverage_pct": round(coverage * 100, 1),
-                "readiness": t_readiness,
+                "readiness": 0.0 if t_readiness is None else t_readiness,
                 "target_accuracy": 80.0  # AZ-900 Target passing threshold
             })
 
-        overall_readiness = round(weighted_readiness_sum / total_weight_sum, 1) if total_weight_sum > 0 else 0.0
+        overall_readiness = overall(readiness_entries)
+        if overall_readiness is None:
+            overall_readiness = 0.0
 
         # Determine weakest topic
         # Prefer topics that have been attempted with lowest accuracy, or lowest readiness

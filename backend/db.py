@@ -80,6 +80,39 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_attempts_user_topic ON attempts(user_id, topic_id);
     """)
 
+    # 5. Exam, plan, and snapshot tables for the readiness tracker
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS exams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL UNIQUE,
+        course TEXT,
+        exam_date TEXT NOT NULL,
+        target_score INTEGER DEFAULT 85,
+        daily_minutes INTEGER DEFAULT 45
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS study_plan (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        plan_date TEXT NOT NULL,
+        activity TEXT NOT NULL,
+        topic_id TEXT,
+        minutes INTEGER,
+        done INTEGER DEFAULT 0
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS readiness_snapshots (
+        user_id TEXT,
+        snap_date TEXT,
+        overall REAL,
+        PRIMARY KEY (user_id, snap_date)
+    );
+    """)
+
     # --- SEED TOPICS ---
     topics_seed = [
         ("cloud-concepts", "Describe cloud concepts", 1.0),

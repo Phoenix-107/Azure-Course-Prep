@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Azure Scholar AZ-900 | Smart Quiz Builder</title>
+  <meta name="description" content="Adaptive AZ-900 smart quiz builder with weighted question sampling, immediate feedback, and missed question review.">
+  
+  <!-- System Typography & Core Styles -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+  <!-- Radiant Header with Azure Deep-to-Electric Gradient & Geometric Accents -->
+  <header class="app-header">
+    <div class="header-bg-decor">
+      <div class="decor-box decor-box-1"></div>
+      <div class="decor-box decor-box-2"></div>
+      <div class="decor-box decor-box-3"></div>
+    </div>
+    
+    <div class="header-container">
+      <div class="brand-wrapper">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.6.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>
+            Azure Scholar <span class="brand-badge">AZ-900</span>
+          </h1>
+          <p>Smart Adaptive Practice Engine</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" aria-label="Main Navigation">
+        <a href="/dashboard" class="nav-link" id="nav-dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+            <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+            <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+            <rect width="7" height="5" x="3" y="16" rx="1"></rect>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/quiz" class="nav-link active" id="nav-quiz">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"></path>
+            <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"></path>
+          </svg>
+          Smart Quiz
+        </a>
+      </nav>
+
+      <!-- Scholar ID Identity Pill -->
+      <div class="scholar-badge" id="scholar-identity-tag" title="Your persistent Scholar UUID in localStorage">
+        <span class="scholar-status-dot"></span>
+        <span id="scholar-id-text">Loading...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Quiz Container -->
+  <main class="page-container">
+    <div class="quiz-wrapper">
+
+      <!-- ===================================================================
+           VIEW 1: TOPIC SELECTION / SETUP VIEW
+           =================================================================== -->
+      <section id="view-setup" class="card setup-card">
+        <div class="setup-header">
+          <h2>Configure Smart Quiz</h2>
+          <p>Choose an Azure syllabus domain or challenge yourself with an adaptive mixed practice mock.</p>
+        </div>
+
+        <!-- Topic Cards Picker -->
+        <div class="topic-selector-grid" id="setup-topic-options">
+          <!-- Dynamically populated or default mock card -->
+          <div class="topic-select-card selected" data-topic-id="all">
+            <div class="topic-select-title">⚡ Mixed Mock Exam</div>
+            <div class="topic-select-desc">Stratified sample across all official AZ-900 domains with 3x wrong-answer weighting.</div>
+          </div>
+        </div>
+
+        <!-- Quiz Length Config -->
+        <div class="quiz-config-bar">
+          <div class="config-item">
+            <label for="select-question-count">Question Count:</label>
+            <select id="select-question-count" class="select-input">
+              <option value="5" selected>5 Questions (Quick)</option>
+              <option value="10">10 Questions (Standard)</option>
+              <option value="20">20 Questions (In-Depth)</option>
+            </select>
+          </div>
+          <div class="config-item">
+            <span>Adaptive Resurfacing:</span>
+            <span class="badge badge-success">3x Multiplier Active</span>
+          </div>
+        </div>
+
+        <button id="btn-start-quiz" class="btn btn-primary" style="font-size: 1rem; padding: 0.85rem 2.5rem;">
+          Start Practice Quiz →
+        </button>
+      </section>
+
+      <!-- ===================================================================
+           VIEW 2 & 3: ACTIVE QUESTION CARD & IMMEDIATE FEEDBACK VIEW
+           =================================================================== -->
+      <section id="view-quiz" style="display: none;">
+        
+        <!-- Top Meta Tracker -->
+        <div class="quiz-meta-bar">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span class="badge badge-azure" id="quiz-topic-badge">Cloud Concepts</span>
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);" id="quiz-progress-text">
+              Question 1 of 5
+            </span>
+          </div>
+          
+          <div class="quiz-timer-pill" id="quiz-timer" title="Elapsed Session Time">
+            ⏱️ <span id="timer-display">00:00</span>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-track" style="margin-bottom: 1.5rem;">
+          <div class="progress-fill" id="quiz-progress-fill" style="width: 20%;"></div>
+        </div>
+
+        <!-- Question Card -->
+        <div class="card quiz-question-card">
+          <span class="question-counter-badge" id="question-header-tag">AZ-900 QUESTION</span>
+          <h3 class="question-text" id="question-text">
+            Loading question prompt...
+          </h3>
+
+          <!-- Option Buttons Container -->
+          <div class="options-list" id="options-container">
+            <!-- Options dynamically injected here -->
+          </div>
+
+          <!-- Immediate Feedback Callout (Hidden until answered) -->
+          <div id="feedback-container" class="feedback-box" style="display: none;">
+            <div class="feedback-header">
+              <span id="feedback-icon">✓</span>
+              <span id="feedback-title">Correct Answer</span>
+            </div>
+            <div class="feedback-text" id="feedback-explanation">
+              Educational explanation will appear here.
+            </div>
+          </div>
+
+          <!-- Action Buttons Bar -->
+          <div class="quiz-action-bar">
+            <button id="btn-submit-answer" class="btn btn-primary" disabled>
+              Check Answer
+            </button>
+            <button id="btn-next-question" class="btn btn-primary" style="display: none;">
+              Next Question →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           VIEW 4: SCORE SUMMARY VIEW
+           =================================================================== -->
+      <section id="view-summary" class="card summary-card" style="display: none;">
+        <div class="summary-icon-large" id="summary-badge-icon">
+          🏆
+        </div>
+        
+        <h2 id="summary-title" style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
+          Quiz Completed!
+        </h2>
+        
+        <div class="summary-score-large" id="summary-score-display">
+          80%
+        </div>
+        
+        <p id="summary-subtitle" style="color: var(--text-secondary); font-size: 1rem;">
+          You answered 4 out of 5 questions correctly.
+        </p>
+
+        <div style="margin: 1.25rem 0;">
+          <span class="badge" id="summary-pass-badge" style="font-size: 0.9rem; padding: 0.4rem 1rem;">
+            Exam Passing Benchmark Achieved
+          </span>
+        </div>
+
+        <!-- Breakdown Table by Topic -->
+        <table class="summary-breakdown-table">
+          <thead>
+            <tr>
+              <th>Domain Topic</th>
+              <th>Answered</th>
+              <th>Accuracy</th>
+            </tr>
+          </thead>
+          <tbody id="summary-breakdown-rows">
+            <!-- Injected by quiz.js -->
+          </tbody>
+        </table>
+
+        <!-- Summary Action Triggers -->
+        <div class="summary-actions-cluster">
+          <button id="btn-retry-missed" class="btn btn-primary" style="display: none;">
+            🔄 Retry Missed Questions (<span id="missed-count-tag">0</span>)
+          </button>
+          <button id="btn-restart-quiz" class="btn btn-secondary">
+            Take Another Quiz
+          </button>
+          <a href="/dashboard" class="btn btn-secondary">
+            Return to Dashboard
+          </a>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Azure Styled Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-copy">
+        <strong>Azure Scholar AZ-900</strong> • Smart Quiz Builder Component
+      </div>
+      <div class="footer-links">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/quiz">Smart Quiz</a>
+        <a href="/docs" target="_blank">FastAPI Docs</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Quiz Engine JavaScript (ES Module) -->
+  <script type="module" src="/static/js/quiz.js"></script>
+</body>
+</html>

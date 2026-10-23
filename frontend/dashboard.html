@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Azure Scholar AZ-900 | Dashboard & Exam Readiness</title>
+  <meta name="description" content="Master Microsoft Azure Fundamentals (AZ-900) with diagnostic analytics, adaptive topic quizzes, and real-time exam readiness tracking.">
+  
+  <!-- Modern System Typography & Core Styles -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+  
+  <!-- Chart.js via CDN for Analytics Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Radiant Header with Azure Deep-to-Electric Gradient & Geometric Accents -->
+  <header class="app-header">
+    <div class="header-bg-decor">
+      <div class="decor-box decor-box-1"></div>
+      <div class="decor-box decor-box-2"></div>
+      <div class="decor-box decor-box-3"></div>
+    </div>
+    
+    <div class="header-container">
+      <div class="brand-wrapper">
+        <div class="brand-icon">
+          <!-- Azure Cloud Monogram Icon -->
+          <svg viewBox="0 0 24 24">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.6.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>
+            Azure Scholar <span class="brand-badge">AZ-900</span>
+          </h1>
+          <p>Microsoft Certified Fundamentals Prep Platform</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" aria-label="Main Navigation">
+        <a href="/dashboard" class="nav-link active" id="nav-dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+            <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+            <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+            <rect width="7" height="5" x="3" y="16" rx="1"></rect>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/quiz" class="nav-link" id="nav-quiz">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"></path>
+            <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"></path>
+          </svg>
+          Smart Quiz
+        </a>
+      </nav>
+
+      <!-- Persistent Scholar ID Display -->
+      <div class="scholar-badge" id="scholar-identity-tag" title="Your persistent Scholar UUID in localStorage">
+        <span class="scholar-status-dot"></span>
+        <span id="scholar-id-text">Loading...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Container -->
+  <main class="page-container">
+    
+    <!-- Page Header Intro -->
+    <section class="page-intro">
+      <h2 class="page-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0078d4" stroke-width="2.2">
+          <path d="M3 3v18h18"></path>
+          <path d="m19 9-5 5-4-4-3 3"></path>
+        </svg>
+        Exam Readiness Command Center
+      </h2>
+      <p class="page-subtitle">Track your mastery across all official AZ-900 domain skills with weighted probability metrics.</p>
+    </section>
+
+    <!-- Top Key Metric Cards -->
+    <section class="metrics-grid">
+      <!-- 1. Overall Readiness -->
+      <div class="card metric-card accent-cyan">
+        <div class="metric-header">
+          <span class="metric-title">Exam Readiness</span>
+          <div class="metric-icon-pill">🎯</div>
+        </div>
+        <div class="metric-value" id="val-readiness">0%</div>
+        <div class="metric-footer">
+          <span class="badge" id="badge-readiness-status">Needs Diagnostic</span>
+          <span>Target: 70%+</span>
+        </div>
+      </div>
+
+      <!-- 2. Questions Attempted -->
+      <div class="card metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Questions Solved</span>
+          <div class="metric-icon-pill">📝</div>
+        </div>
+        <div class="metric-value" id="val-attempts">0</div>
+        <div class="metric-footer">
+          <span id="val-correct-count">0 correct responses</span>
+        </div>
+      </div>
+
+      <!-- 3. Overall Accuracy -->
+      <div class="card metric-card accent-green">
+        <div class="metric-header">
+          <span class="metric-title">Accuracy Rate</span>
+          <div class="metric-icon-pill">⚡</div>
+        </div>
+        <div class="metric-value" id="val-accuracy">0%</div>
+        <div class="metric-footer">
+          <span class="badge badge-azure" id="val-accuracy-badge">Benchmarking</span>
+        </div>
+      </div>
+
+      <!-- 4. Weakest Topic Alert -->
+      <div class="card metric-card accent-amber">
+        <div class="metric-header">
+          <span class="metric-title">Focus Priority</span>
+          <div class="metric-icon-pill">⚠️</div>
+        </div>
+        <div class="metric-value" id="val-weakest-title" style="font-size: 1.25rem; font-weight: 700; margin: 0.2rem 0;">
+          All Topics
+        </div>
+        <div class="metric-footer">
+          <a href="/quiz" id="btn-practice-weakest" class="badge badge-warning" style="text-decoration:none;">
+            Practice Weakest Topic →
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Analytics Section (Chart & Readiness Gauge) -->
+    <div class="dashboard-main-grid">
+      
+      <!-- Chart.js Domain Mastery Visualizer -->
+      <section class="card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Domain Mastery vs Target (80%)</h3>
+          <span class="badge badge-azure">Official Weights</span>
+        </div>
+        <div style="height: 280px; position: relative;">
+          <canvas id="topicMasteryChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Readiness Gauge & Quick Diagnostic Summary -->
+      <section class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div class="card-title-bar">
+            <h3 class="card-heading">Readiness Analysis</h3>
+            <span class="badge badge-success">AZ-900 Certified Model</span>
+          </div>
+
+          <div class="readiness-gauge-box">
+            <div class="gauge-canvas-wrapper">
+              <canvas id="readinessDonutChart"></canvas>
+              <div class="gauge-center-text">
+                <div class="gauge-percentage" id="donut-pct-text">0%</div>
+                <div class="gauge-label">Score</div>
+              </div>
+            </div>
+            <div class="readiness-details">
+              <h4 id="gauge-status-heading">Diagnostic Required</h4>
+              <p id="gauge-status-desc">Complete your initial diagnostic test to benchmark your Azure skills against the syllabus.</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-light); padding-top: 1rem;">
+          <a href="/quiz?mode=diagnostic&n=6" class="btn btn-primary" style="width: 100%;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Launch Full Diagnostic Quiz (6 Qs)
+          </a>
+        </div>
+      </section>
+    </div>
+
+    <!-- Quick Action Launchers -->
+    <section style="margin-bottom: 2rem;">
+      <h3 class="card-heading" style="margin-bottom: 1rem;">Study Shortcuts</h3>
+      <div class="shortcuts-grid">
+        <div class="shortcut-card" onclick="window.location.href='/quiz?mode=diagnostic&n=6'">
+          <div class="shortcut-icon shortcut-blue">⚡</div>
+          <div class="shortcut-details">
+            <h4>Start Diagnostic Quiz</h4>
+            <p>Comprehensive 6-question sample covering all 3 syllabus domains.</p>
+          </div>
+        </div>
+
+        <div class="shortcut-card" id="shortcut-weakest-card">
+          <div class="shortcut-icon shortcut-amber">🎯</div>
+          <div class="shortcut-details">
+            <h4>Target Weakest Topic</h4>
+            <p id="shortcut-weakest-desc">Focus practice where your accuracy is lowest.</p>
+          </div>
+        </div>
+
+        <div class="shortcut-card" onclick="window.location.href='/quiz?mode=mock&n=5'">
+          <div class="shortcut-icon shortcut-green">📋</div>
+          <div class="shortcut-details">
+            <h4>Quick Mixed Quiz</h4>
+            <p>5 rapid questions with 3x weighting for recent mistakes.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Per-Topic Syllabus Progress Cards -->
+    <section class="card">
+      <div class="card-title-bar">
+        <h3 class="card-heading">Curriculum Domain Progress</h3>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Weighted by Microsoft Official AZ-900 Exam Blueprint</span>
+      </div>
+
+      <div class="topics-list" id="topics-container">
+        <!-- Dynamically populated via dashboard.js -->
+        <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+          Loading curriculum domains and your stats...
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Azure Styled Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-copy">
+        <strong>Azure Scholar AZ-900</strong> • Built for Microsoft Certified Azure Fundamentals Revision
+      </div>
+      <div class="footer-links">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/quiz">Smart Quiz</a>
+        <a href="/docs" target="_blank">FastAPI Docs</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Dashboard JavaScript Logic (ES Modules) -->
+  <script type="module" src="/static/js/dashboard.js"></script>
+</body>
+</html>

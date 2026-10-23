@@ -32,7 +32,7 @@ def topic_readiness(quiz_acc: Optional[float], card_mastery: Optional[float], re
     if not parts:
         return None
 
-    parts.append(max(0.0, float(recency)))
+    parts.append(min(1.0, max(0.0, float(recency))))
     weights.append(0.20)
 
     score = sum(p * w for p, w in zip(parts, weights)) / sum(weights)
@@ -49,10 +49,15 @@ def overall(topics: Iterable[dict]) -> Optional[float]:
     return round(weighted / total_weight, 1) if total_weight else None
 
 
-def pressure(topics: Iterable[dict], days_left: int, daily_minutes: int) -> float:
+def pressure(
+    topics: Iterable[dict],
+    days_left: int,
+    daily_minutes: int,
+    target: float = TARGET,
+) -> float:
     """Return the planning pressure ratio needed to choose a study mode."""
     needed = sum(
-        max(0.0, TARGET - (float(t.get("readiness") or 0.0))) * float(t.get("weight", 1.0)) * MIN_PER_POINT
+        max(0.0, target - (float(t.get("readiness") or 0.0))) * float(t.get("weight", 1.0)) * MIN_PER_POINT
         for t in topics
     )
     available = max(1, int(days_left)) * max(1, int(daily_minutes))
@@ -67,13 +72,22 @@ def choose_mode(p: float, has_activity: bool) -> str:
     return "polish"
 
 
-def build_day_plan(topics: Iterable[dict], daily_minutes: int, mode: str, due_cards: int, days_left: int):
+def build_day_plan(
+    topics: Iterable[dict],
+    daily_minutes: int,
+    mode: str,
+    due_cards: int,
+    days_left: int,
+    target: float = TARGET,
+    days_since_last_mock: Optional[int] = None,
+):
     """Build a list of plan items for the current day."""
+    topics = list(topics)
     plan = []
-    left = int(daily_minutes)
+    left = max(0, int(daily_minutes))
 
     if days_left <= 2:
-        return [{"activity": "review", "minutes": daily_minutes}]
+        return [{"activity": "review", "minutes": left}]
 
     if due_cards:
         card_min = min(-(-due_cards * 25 // 60), int(left * 0.4))
@@ -81,22 +95,47 @@ def build_day_plan(topics: Iterable[dict], daily_minutes: int, mode: str, due_ca
             plan.append({"activity": "flashcards", "minutes": card_min, "count": due_cards})
             left -= card_min
 
-    limit = {"polish": 3, "steady": 5}.get(mode, len(list(topics)))
+    limit = {"polish": 3, "steady": 5}.get(mode, len(topics))
     weak = sorted(
-        ({**t, "gap": max(0.0, TARGET - (float(t.get("readiness") or 0.0))) * float(t.get("weight", 1.0))}
-        for t in topics),
+        (
+            {
+                **t,
+                "gap": max(0.0, target - (float(t.get("readiness") or 0.0)))
+                * float(t.get("weight", 1.0)),
+            }
+            for t in topics
+            if mode != "polish" or t.get("readiness") is not None
+        ),
         key=lambda t: t["gap"],
         reverse=True,
     )
     weak = [t for t in weak if t["gap"] > 0][:limit]
     total = sum(t["gap"] for t in weak) or 1
 
-    for t in weak:
-        minutes = max(5, round(left * t["gap"] / total))
-        if minutes <= 0:
-            continue
+    for index, t in enumerate(weak):
+        if left <= 0:
+            break
+        minutes = left if index == len(weak) - 1 else min(left, max(1, round(left * t["gap"] / total)))
         plan.append({"activity": "quiz", "topic_id": t.get("id"), "minutes": minutes})
         left -= minutes
+
+    mock_interval = {"intensive": 4, "steady": 7, "polish": 6}.get(mode)
+    if (
+        mock_interval
+        and days_since_last_mock is not None
+        and days_since_last_mock >= mock_interval
+        and daily_minutes >= 40
+    ):
+        shortfall = max(0, sum(item["minutes"] for item in plan) + 40 - daily_minutes)
+        for item in reversed(plan):
+            if item["activity"] != "quiz" or shortfall <= 0:
+                continue
+            reduction = min(item["minutes"], shortfall)
+            item["minutes"] -= reduction
+            shortfall -= reduction
+        plan = [item for item in plan if item["minutes"] > 0]
+        if sum(item["minutes"] for item in plan) + 40 <= daily_minutes:
+            plan.append({"activity": "mock", "minutes": 40})
 
     return plan
 

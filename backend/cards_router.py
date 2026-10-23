@@ -40,10 +40,10 @@ class ResetCardsRequest(BaseModel):
 
 class ExamCreateRequest(BaseModel):
     user_id: str
-    exam_date: str
+    exam_date: datetime.date
     course: str = "AZ-900"
-    target_score: int = 85
-    daily_minutes: int = 45
+    target_score: int = Field(85, ge=0, le=100)
+    daily_minutes: int = Field(45, ge=1, le=600)
 
 
 class CardOut(BaseModel):
@@ -463,23 +463,50 @@ def dev_reset_cards(payload: ResetCardsRequest):
 
 @router.post("/api/exams")
 def create_exam(payload: ExamCreateRequest):
-    """Register target exam date for interval capping."""
+    """Create or update a user's exam configuration."""
     conn = get_db_connection()
     try:
-        cursor = conn.cursor()
-        cursor.execute(
+        update = conn.execute(
             """
-            INSERT INTO exams (user_id, course, exam_date, target_score, daily_minutes)
-            VALUES (?, ?, ?, ?, ?)
+            UPDATE exams
+            SET course = ?, exam_date = ?, target_score = ?, daily_minutes = ?
+            WHERE user_id = ?
             """,
-            (payload.user_id, payload.course, payload.exam_date, payload.target_score, payload.daily_minutes)
+            (
+                payload.course,
+                payload.exam_date.isoformat(),
+                payload.target_score,
+                payload.daily_minutes,
+                payload.user_id,
+            ),
         )
+        if update.rowcount == 0:
+            cursor = conn.execute(
+                """
+                INSERT INTO exams (user_id, course, exam_date, target_score, daily_minutes)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.user_id,
+                    payload.course,
+                    payload.exam_date.isoformat(),
+                    payload.target_score,
+                    payload.daily_minutes,
+                ),
+            )
+            exam_id = cursor.lastrowid
+        else:
+            row = conn.execute(
+                "SELECT id FROM exams WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+                (payload.user_id,),
+            ).fetchone()
+            exam_id = row["id"]
         conn.commit()
         return {
-            "id": cursor.lastrowid,
+            "id": exam_id,
             "user_id": payload.user_id,
             "course": payload.course,
-            "exam_date": payload.exam_date,
+            "exam_date": payload.exam_date.isoformat(),
             "target_score": payload.target_score,
             "daily_minutes": payload.daily_minutes
         }

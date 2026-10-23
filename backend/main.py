@@ -8,10 +8,11 @@ import json
 import random
 import time
 from collections import defaultdict
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Path as PathParameter, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -94,6 +95,10 @@ class AttemptResponse(BaseModel):
     explanation: str
 
 
+class PlanDoneRequest(BaseModel):
+    user_id: str
+
+
 # --- Lifecycle Events ---
 
 @app.on_event("startup")
@@ -103,166 +108,358 @@ def on_startup():
 
 # --- API Routes ---
 
-@app.post("/api/exams")
-def save_exam(
-    user_id: str = Query(..., description="Unique scholar ID"),
-    course: Optional[str] = Query(None),
-    exam_date: str = Query(..., description="YYYY-MM-DD"),
-    target_score: int = Query(85, ge=0, le=100),
-    daily_minutes: int = Query(45, ge=1, le=600),
-):
-    """Persist exam configuration and close the loop for the readiness tracker."""
-    conn = get_db_connection()
+def _activity_date(timestamp: Optional[str]) -> Optional[date]:
+    if not timestamp:
+        return None
     try:
+        return date.fromisoformat(timestamp[:10])
+    except ValueError:
+        return None
+
+
+def _readiness_summary(conn, user_id: str) -> dict:
+    today = date.fromisoformat(srs.get_today())
+    topics_rows = conn.execute(
+        """
+        SELECT t.id, t.name, t.weight, COUNT(q.id) AS question_count
+        FROM topics t
+        LEFT JOIN questions q ON t.id = q.topic_id
+        GROUP BY t.id, t.name, t.weight
+        ORDER BY t.id
+        """
+    ).fetchall()
+    attempts_rows = conn.execute(
+        """
+        SELECT question_id, topic_id, correct, answered_at, mode
+        FROM attempts
+        WHERE user_id = ?
+        ORDER BY answered_at DESC, id DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    card_rows = conn.execute(
+        """
+        SELECT c.topic_id, cs.interval, cs.lapses, cs.last_reviewed
+        FROM card_state cs
+        JOIN cards c ON c.id = cs.card_id
+        WHERE cs.user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
+
+    attempts_by_topic = defaultdict(list)
+    cards_by_topic = defaultdict(list)
+    for attempt in attempts_rows:
+        attempts_by_topic[attempt["topic_id"]].append(attempt)
+    for card in card_rows:
+        cards_by_topic[card["topic_id"]].append(card)
+
+    topic_metrics = []
+    for topic in topics_rows:
+        topic_id = topic["id"]
+        attempts = attempts_by_topic.get(topic_id, [])
+        recent_attempts = attempts[:10]
+        if recent_attempts:
+            weights = range(len(recent_attempts), 0, -1)
+            quiz_accuracy = sum(
+                float(attempt["correct"]) * weight
+                for attempt, weight in zip(recent_attempts, weights)
+            ) / sum(weights)
+        else:
+            quiz_accuracy = None
+
+        started_cards = cards_by_topic.get(topic_id, [])
+        card_mastery = None
+        if started_cards:
+            mastered = sum(
+                1 for card in started_cards
+                if card["interval"] >= 21 and card["lapses"] < 3
+            )
+            card_mastery = mastered / len(started_cards)
+
+        activity_dates = [
+            activity_date
+            for activity_date in (
+                [_activity_date(attempt["answered_at"]) for attempt in attempts]
+                + [_activity_date(card["last_reviewed"]) for card in started_cards]
+            )
+            if activity_date is not None
+        ]
+        last_activity = max(activity_dates) if activity_dates else None
+        days_since_activity = (today - last_activity).days if last_activity else 14
+        recency = min(1.0, max(0.0, 1.0 - days_since_activity / 14.0))
+        readiness_score = topic_readiness(quiz_accuracy, card_mastery, recency)
+        topic_metrics.append({
+            "id": topic_id,
+            "name": topic["name"],
+            "weight": float(topic["weight"]),
+            "readiness": readiness_score,
+            "quiz_accuracy": round(quiz_accuracy * 100, 1) if quiz_accuracy is not None else None,
+            "card_mastery": round(card_mastery * 100, 1) if card_mastery is not None else None,
+            "recency": round(recency * 100, 1),
+            "attempts": len(attempts),
+        })
+
+    exam_row = conn.execute(
+        """
+        SELECT exam_date, daily_minutes, target_score, course
+        FROM exams
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (user_id,),
+    ).fetchone()
+    exam_date = exam_row["exam_date"] if exam_row else None
+    exam_passed = bool(exam_date and date.fromisoformat(exam_date) < today)
+    days_left = max(0, (date.fromisoformat(exam_date) - today).days) if exam_date else None
+    daily_minutes = int(exam_row["daily_minutes"]) if exam_row else 45
+    target_score = int(exam_row["target_score"]) if exam_row else 85
+
+    known_topics = [
+        {"readiness": topic["readiness"], "weight": topic["weight"]}
+        for topic in topic_metrics
+        if topic["readiness"] is not None
+    ]
+    overall_score = overall(known_topics)
+    has_activity = any(
+        attempts_by_topic.values()
+    ) or any(card["last_reviewed"] for card in card_rows)
+    pressure_score = pressure(
+        [{"readiness": topic["readiness"], "weight": topic["weight"]} for topic in topic_metrics],
+        days_left if days_left is not None else 30,
+        daily_minutes,
+        target_score,
+    )
+    mode = choose_mode(pressure_score, has_activity)
+
+    if overall_score is not None:
         conn.execute(
             """
-            INSERT INTO exams (user_id, course, exam_date, target_score, daily_minutes)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                course = excluded.course,
-                exam_date = excluded.exam_date,
-                target_score = excluded.target_score,
-                daily_minutes = excluded.daily_minutes
+            INSERT INTO readiness_snapshots (user_id, snap_date, overall)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, snap_date) DO UPDATE SET overall = excluded.overall
             """,
-            (user_id, course, exam_date, target_score, daily_minutes),
+            (user_id, today.isoformat(), overall_score),
         )
         conn.commit()
-        return {
-            "user_id": user_id,
-            "course": course,
-            "exam_date": exam_date,
-            "target_score": target_score,
-            "daily_minutes": daily_minutes,
-        }
-    finally:
-        conn.close()
+        baseline = conn.execute(
+            """
+            SELECT overall FROM readiness_snapshots
+            WHERE user_id = ? AND snap_date <= ?
+            ORDER BY snap_date DESC LIMIT 1
+            """,
+            (user_id, (today - timedelta(days=7)).isoformat()),
+        ).fetchone()
+        delta_7d = round(overall_score - baseline["overall"], 1) if baseline else 0.0
+    else:
+        delta_7d = 0.0
+
+    weakest_topics = sorted(
+        (topic for topic in topic_metrics if topic["readiness"] is not None),
+        key=lambda topic: topic["readiness"],
+    )
+    if not has_activity:
+        note = "Start with a diagnostic quiz to establish your baseline across all Azure topics."
+    elif not exam_date:
+        note = "Set an exam date to get a countdown and a schedule tailored to your remaining study time."
+    elif exam_passed:
+        note = "Your exam date has passed. Update it to continue receiving an adaptive study plan."
+    else:
+        note = coach_note(
+            mode,
+            days_left if days_left is not None else 0,
+            overall_score or 0.0,
+            [topic["name"] for topic in weakest_topics],
+        )
+
+    return {
+        "overall": overall_score,
+        "delta_7d": delta_7d,
+        "mode": mode,
+        "days_left": days_left,
+        "exam_date": exam_date,
+        "exam_passed": exam_passed,
+        "daily_minutes": daily_minutes,
+        "target_score": target_score,
+        "course": exam_row["course"] if exam_row else None,
+        "has_activity": has_activity,
+        "topics": topic_metrics,
+        "coach_note": note,
+    }
 
 
 @app.get("/api/readiness")
 def get_readiness(user_id: str = Query(..., description="Unique scholar ID")):
-    """Return readiness summary and suggested study mode using the rule-based formulas."""
+    """Return transparent readiness inputs, exam countdown, and suggested mode."""
     conn = get_db_connection()
     try:
-        topics_rows = conn.execute(
-            """
-            SELECT t.id, t.name, t.weight, COUNT(q.id) AS question_count
-            FROM topics t
-            LEFT JOIN questions q ON t.id = q.topic_id
-            GROUP BY t.id, t.name, t.weight
-            ORDER BY t.id
-            """
-        ).fetchall()
+        return _readiness_summary(conn, user_id)
+    finally:
+        conn.close()
 
-        attempts_rows = conn.execute(
+
+@app.get("/api/readiness/trend")
+def get_readiness_trend(user_id: str = Query(..., description="Unique scholar ID")):
+    conn = get_db_connection()
+    try:
+        exam_row = conn.execute(
+            "SELECT exam_date FROM exams WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        exam_date = exam_row["exam_date"] if exam_row else None
+        rows = conn.execute(
             """
-            SELECT a.question_id, a.topic_id, a.correct, a.answered_at
-            FROM attempts a
-            WHERE a.user_id = ?
-            ORDER BY a.answered_at DESC
+            SELECT snap_date, overall FROM readiness_snapshots
+            WHERE user_id = ?
+            ORDER BY snap_date
             """,
             (user_id,),
         ).fetchall()
-
-        topic_attempts_map = defaultdict(list)
-        for attempt in attempts_rows:
-            topic_attempts_map[attempt["topic_id"]].append(attempt["correct"])
-
-        topic_metrics = []
-        for topic in topics_rows:
-            topic_id = topic["id"]
-            attempts = topic_attempts_map.get(topic_id, [])
-            q_count = int(topic["question_count"])
-            if attempts:
-                accuracy = sum(attempts) / len(attempts)
-                unique_questions = len({a["question_id"] for a in attempts_rows if a["topic_id"] == topic_id})
-                coverage = unique_questions / q_count if q_count else 0.0
-                recency = 1.0
-                readiness = topic_readiness(accuracy, min(1.0, coverage), recency)
-            else:
-                readiness = None
-            topic_metrics.append({
-                "id": topic_id,
-                "name": topic["name"],
-                "readiness": readiness,
-                "weight": float(topic["weight"]),
-                "accuracy": round((sum(attempts) / len(attempts) * 100), 1) if attempts else 0.0,
-                "attempts": len(attempts),
-            })
-
-        days_left = 0
-        exam_row = conn.execute(
-            "SELECT exam_date, daily_minutes, target_score FROM exams WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-        if exam_row:
-            from datetime import date
-            try:
-                exam_date = date.fromisoformat(exam_row["exam_date"])
-                days_left = max(0, (exam_date - date.today()).days)
-            except ValueError:
-                days_left = 0
-
-        overall_score = overall([
-            {"readiness": entry["readiness"], "weight": entry["weight"]}
-            for entry in topic_metrics if entry["readiness"] is not None
-        ])
-        if overall_score is None:
-            overall_score = 0.0
-
-        pressure_score = pressure(
-            [{"readiness": entry["readiness"], "weight": entry["weight"]} for entry in topic_metrics],
-            days_left,
-            exam_row["daily_minutes"] if exam_row else 45,
-        )
-        mode = choose_mode(pressure_score, bool(attempts_rows))
-        weakest = sorted(topic_metrics, key=lambda t: (t["readiness"] if t["readiness"] is not None else 100, t["accuracy"]))
-        weakest_name = weakest[0]["name"] if weakest else "your study plan"
-
-        return {
-            "overall": round(overall_score, 1),
-            "days_left": days_left,
-            "mode": mode,
-            "delta_7d": 0.0,
-            "topics": [
-                {"id": item["id"], "name": item["name"], "readiness": item["readiness"]}
-                for item in topic_metrics
-            ],
-            "coach_note": coach_note(mode, days_left, overall_score, [weakest_name])
-        }
+        snapshots = [
+            {"date": row["snap_date"], "readiness": float(row["overall"])}
+            for row in rows
+        ]
+        projection = None
+        if (
+            exam_date
+            and snapshots
+            and date.fromisoformat(exam_date) >= date.fromisoformat(snapshots[-1]["date"])
+        ):
+            points = [
+                (date.fromisoformat(item["date"]).toordinal(), item["readiness"])
+                for item in snapshots
+            ]
+            mean_x = sum(point[0] for point in points) / len(points)
+            mean_y = sum(point[1] for point in points) / len(points)
+            denominator = sum((x - mean_x) ** 2 for x, _ in points)
+            slope = (
+                sum((x - mean_x) * (y - mean_y) for x, y in points) / denominator
+                if len(points) > 1 and denominator
+                else 0.0
+            )
+            projected = mean_y + slope * (date.fromisoformat(exam_date).toordinal() - mean_x)
+            projection = {
+                "date": exam_date,
+                "readiness": round(min(100.0, max(0.0, projected)), 1),
+            }
+        return {"snapshots": snapshots, "projection": projection}
     finally:
         conn.close()
 
 
 @app.get("/api/plan/today")
 def get_plan_today(user_id: str = Query(..., description="Unique scholar ID")):
-    """Return a simple adaptive plan matching the readiness tracker design."""
+    """Recompute and persist today's adaptive study checklist."""
+    readiness = get_readiness(user_id=user_id)
     conn = get_db_connection()
     try:
-        readiness = get_readiness(user_id=user_id)
-        exam_row = conn.execute(
-            "SELECT exam_date, daily_minutes FROM exams WHERE user_id = ?",
+        today = srs.get_today()
+        due_cards = conn.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM card_state
+            WHERE user_id = ? AND due_date <= ?
+            """,
+            (user_id, today),
+        ).fetchone()["count"]
+        last_mock = conn.execute(
+            """
+            SELECT answered_at FROM attempts
+            WHERE user_id = ? AND mode = 'mock'
+            ORDER BY answered_at DESC, id DESC LIMIT 1
+            """,
             (user_id,),
         ).fetchone()
-
-        daily_minutes = exam_row["daily_minutes"] if exam_row else 45
-        topics = readiness["topics"]
-        days_left = readiness["days_left"]
-        mode = readiness["mode"]
-        due_cards = 0
-        plan = build_day_plan(
-            [{"id": t["id"], "readiness": t["readiness"], "weight": 1.0} for t in topics],
-            daily_minutes,
-            mode,
-            due_cards,
-            days_left,
+        activity_anchor_date = _activity_date(last_mock["answered_at"]) if last_mock else None
+        if activity_anchor_date is None:
+            first_activity = conn.execute(
+                """
+                SELECT MIN(activity_date) AS activity_date
+                FROM (
+                    SELECT answered_at AS activity_date FROM attempts WHERE user_id = ?
+                    UNION ALL
+                    SELECT reviewed_at AS activity_date FROM review_log WHERE user_id = ?
+                )
+                """,
+                (user_id, user_id),
+            ).fetchone()
+            activity_anchor_date = _activity_date(first_activity["activity_date"])
+        days_since_last_mock = (
+            max(0, (date.fromisoformat(today) - activity_anchor_date).days)
+            if activity_anchor_date
+            else None
         )
+        planning_days_left = readiness["days_left"] if readiness["days_left"] is not None else 999
 
+        if not readiness["has_activity"]:
+            plan = [{"activity": "diagnostic", "minutes": readiness["daily_minutes"]}]
+        else:
+            plan = build_day_plan(
+                [
+                    {"id": topic["id"], "readiness": topic["readiness"], "weight": topic["weight"]}
+                    for topic in readiness["topics"]
+                ],
+                readiness["daily_minutes"],
+                readiness["mode"],
+                due_cards,
+                planning_days_left,
+                readiness["target_score"],
+                days_since_last_mock,
+            )
+
+        existing_rows = conn.execute(
+            "SELECT id, activity, topic_id, done FROM study_plan WHERE user_id = ? AND plan_date = ?",
+            (user_id, today),
+        ).fetchall()
+        completed = {
+            (row["activity"], row["topic_id"]): bool(row["done"])
+            for row in existing_rows
+        }
+        conn.execute("DELETE FROM study_plan WHERE user_id = ? AND plan_date = ?", (user_id, today))
+        for item in plan:
+            cursor = conn.execute(
+                """
+                INSERT INTO study_plan (user_id, plan_date, activity, topic_id, minutes, done)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    today,
+                    item["activity"],
+                    item.get("topic_id"),
+                    item["minutes"],
+                    int(completed.get((item["activity"], item.get("topic_id")), False)),
+                ),
+            )
+            item["id"] = cursor.lastrowid
+            item["done"] = bool(completed.get((item["activity"], item.get("topic_id")), False))
+        conn.commit()
         return {
-            "mode": mode,
+            "mode": readiness["mode"],
             "minutes_total": sum(item["minutes"] for item in plan),
             "items": plan,
             "coach_note": readiness["coach_note"],
         }
+    finally:
+        conn.close()
+
+
+@app.post("/api/plan/{plan_id}/done")
+def mark_plan_item_done(
+    payload: PlanDoneRequest,
+    plan_id: int = PathParameter(..., ge=1),
+):
+    conn = get_db_connection()
+    try:
+        cursor = conn.execute(
+            "UPDATE study_plan SET done = 1 WHERE id = ? AND user_id = ?",
+            (plan_id, payload.user_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Study plan item not found")
+        conn.commit()
+        return {"id": plan_id, "done": True}
     finally:
         conn.close()
 

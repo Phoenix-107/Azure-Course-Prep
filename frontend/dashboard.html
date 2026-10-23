@@ -89,6 +89,70 @@
       <p class="page-subtitle">Track your mastery across all official AZ-900 domain skills with weighted probability metrics.</p>
     </section>
 
+    <section class="tracker-summary card" aria-live="polite">
+      <div>
+        <span class="metric-title">Exam countdown</span>
+        <h2 id="exam-countdown">Set an exam date to start your countdown</h2>
+        <p id="readiness-delta" class="tracker-delta">Weekly readiness change: 0.0%</p>
+      </div>
+      <div class="tracker-mode">
+        <span class="metric-title">Study mode</span>
+        <span class="badge badge-warning" id="readiness-mode">Intensive</span>
+      </div>
+    </section>
+
+    <div class="dashboard-main-grid tracker-grid">
+      <section class="card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Exam setup</h3>
+          <span class="badge badge-azure" id="exam-setup-status">No exam configured</span>
+        </div>
+        <form id="exam-setup-form" class="exam-setup-form">
+          <label>
+            Exam date
+            <input id="exam-date" name="exam_date" type="date" required>
+          </label>
+          <div class="exam-form-row">
+            <label>
+              Daily study minutes
+              <input id="daily-minutes" name="daily_minutes" type="number" min="1" max="600" value="45" required>
+            </label>
+            <label>
+              Target score
+              <input id="target-score" name="target_score" type="number" min="0" max="100" value="85" required>
+            </label>
+          </div>
+          <label>
+            Course
+            <input id="exam-course" name="course" type="text" value="AZ-900" maxlength="100">
+          </label>
+          <button class="btn btn-primary" type="submit">Save exam plan</button>
+          <p id="exam-form-message" class="form-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Today's study plan</h3>
+          <span class="badge badge-azure" id="plan-minutes">Loading...</span>
+        </div>
+        <p id="plan-coach-note" class="coach-note"></p>
+        <div id="today-plan" class="today-plan" aria-live="polite">
+          <p class="empty-state">Building your study plan...</p>
+        </div>
+      </section>
+    </div>
+
+    <section class="card trend-card">
+      <div class="card-title-bar">
+        <h3 class="card-heading">Readiness trend</h3>
+        <span class="badge badge-azure">Daily snapshots + exam-day projection</span>
+      </div>
+      <div class="trend-chart-wrap">
+        <canvas id="readinessTrendChart" aria-label="Readiness history and exam-day projection"></canvas>
+      </div>
+    </section>
+
     <!-- Top Key Metric Cards -->
     <section class="metrics-grid">
       <!-- 1. Overall Readiness -->
@@ -100,7 +164,7 @@
         <div class="metric-value" id="val-readiness">0%</div>
         <div class="metric-footer">
           <span class="badge" id="badge-readiness-status">Needs Diagnostic</span>
-          <span>Target: 70%+</span>
+          <span id="readiness-target-label">Target: 85%+</span>
         </div>
       </div>
 
@@ -151,7 +215,7 @@
       <!-- Chart.js Domain Mastery Visualizer -->
       <section class="card">
         <div class="card-title-bar">
-          <h3 class="card-heading">Domain Mastery vs Target (80%)</h3>
+          <h3 class="card-heading" id="topic-chart-title">Topic Readiness vs Target</h3>
           <span class="badge badge-azure">Official Weights</span>
         </div>
         <div style="height: 280px; position: relative;">
@@ -227,8 +291,8 @@
     <!-- Per-Topic Syllabus Progress Cards -->
     <section class="card">
       <div class="card-title-bar">
-        <h3 class="card-heading">Curriculum Domain Progress</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Weighted by Microsoft Official AZ-900 Exam Blueprint</span>
+        <h3 class="card-heading">Topic readiness signals</h3>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Quiz, flashcard mastery, and recent activity</span>
       </div>
 
       <div class="topics-list" id="topics-container">

@@ -238,15 +238,15 @@ Optional upgrade: send the same numbers to the LLM and ask for a 3-sentence enco
 
 ## 12. Build checklist
 
-- [ ] Fake-data topic bar chart and gauge
-- [ ] `topic_readiness()` with unit tests
-- [ ] Exam setup form and `/api/exams`
-- [ ] `pressure()` and `choose_mode()`
-- [ ] `build_day_plan()` and the plan checklist
-- [ ] Connect to real `attempts` and `card_state`
-- [ ] Diagnostic flow for new users
-- [ ] Daily snapshot, trend line, projection
-- [ ] Coach note (template first)
+- [x] Topic readiness bar chart and gauge
+- [x] `topic_readiness()` with unit tests
+- [x] Exam setup form and `/api/exams`
+- [x] `pressure()` and `choose_mode()`
+- [x] `build_day_plan()` and the persisted plan checklist
+- [x] Connect to real `attempts` and `card_state`
+- [x] Diagnostic plan for new users
+- [x] Daily snapshot, trend line, and exam-day projection
+- [x] Coach note (template first)
 
 ## 13. Testing scenarios
 

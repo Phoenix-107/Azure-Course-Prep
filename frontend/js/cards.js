@@ -92,6 +92,7 @@ async function loadTopics() {
   try {
     const topics = await fetchJson("/api/topics");
     topicsMap = {};
+    const requestedTopic = new URLSearchParams(window.location.search).get("topic");
     if (topicSelectEl) {
       topicSelectEl.innerHTML = `<option value="all">All Syllabus Topics</option>`;
       topics.forEach((t) => {
@@ -101,6 +102,10 @@ async function loadTopics() {
         opt.textContent = `${t.name} (${t.question_count || 0})`;
         topicSelectEl.appendChild(opt);
       });
+      if (requestedTopic && topicsMap[requestedTopic]) {
+        selectedTopic = requestedTopic;
+        topicSelectEl.value = requestedTopic;
+      }
     }
   } catch (err) {
     console.error("Failed to load topics:", err);

@@ -78,6 +78,10 @@ def run_tests():
     assert quiz_res.status_code == 200
     assert "Smart Quiz" in quiz_res.text
 
+    flash_res = requests.get(f"{base_url}/flashcards")
+    assert flash_res.status_code == 200
+    assert "Flashcards Coach" in flash_res.text
+
     css_res = requests.get(f"{base_url}/static/css/styles.css")
     assert css_res.status_code == 200
     assert "--azure-primary" in css_res.text

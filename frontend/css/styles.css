@@ -1673,3 +1673,118 @@ button {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ==========================================================================
+   ===== Backgrounds & flashcard theme =====
+   ========================================================================== */
+
+/* Site-wide Background (Task 1) */
+body {
+  background-color: #d6ecfc;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.60)), url('/static/img/tech_back.jpg');
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* iOS Safari & Small Screen Fallback for fixed background-attachment */
+@media (max-width: 768px) {
+  body {
+    background-attachment: scroll;
+    background-image: none;
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-color: #d6ecfc;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.60)), url('/static/img/tech_back.jpg');
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+    pointer-events: none;
+  }
+}
+
+/* Enhance panels & cards contrast over textured background */
+.card,
+.setup-card,
+.quiz-question-card,
+.summary-card,
+.fc-summary-card,
+.fc-empty-card,
+.study-plan-card,
+.domain-card {
+  box-shadow: 0 4px 18px rgba(13, 27, 42, 0.08), 0 1px 3px rgba(13, 27, 42, 0.05);
+}
+
+/* Purple Hive Background & Theme for Flashcards (Task 2) */
+.fc-card {
+  box-shadow: 0 10px 40px rgba(124, 58, 237, 0.35);
+  border-radius: var(--radius-lg);
+}
+
+.fc-face {
+  background-color: #150524;
+  background-image: linear-gradient(rgba(20, 0, 40, 0.55), rgba(20, 0, 40, 0.55)), url('/static/img/hive_back.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.fc-face-front {
+  border-top: 4px solid #a855f7;
+}
+
+.fc-face-back {
+  border-top: 4px solid var(--azure-cyan-accent);
+  background-image: linear-gradient(rgba(10, 0, 25, 0.75), rgba(18, 0, 36, 0.70)), url('/static/img/hive_back.jpg');
+}
+
+/* Flashcard Interior Typography & Light Chips */
+.fc-content {
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.fc-topic-tag {
+  color: #e0e7ff;
+  background: rgba(124, 58, 237, 0.35);
+  border: 1px solid rgba(192, 132, 252, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.fc-type-pill {
+  color: #cbd5e1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.fc-cloze-blank {
+  color: #38bdf8;
+  border-bottom: 2px dashed #38bdf8;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+.fc-hint-box {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-left: 3px solid #fbbf24;
+  color: #fef08a;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.fc-face-footer {
+  color: #cbd5e1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+

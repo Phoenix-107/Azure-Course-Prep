@@ -12,8 +12,15 @@ from pydantic import BaseModel, Field
 
 from backend.db import get_db_connection
 from backend import srs
+from backend.dev_router import (
+    AdvanceDaysRequest,
+    ResetCardsRequest,
+    dev_advance_days,
+    dev_reset_cards,
+)
 
 router = APIRouter()
+
 
 
 # --- Pydantic Models ---
@@ -29,13 +36,6 @@ class ReviewResponse(BaseModel):
     interval: int
     ease: float
 
-
-class AdvanceDaysRequest(BaseModel):
-    days: int
-
-
-class ResetCardsRequest(BaseModel):
-    user_id: str
 
 
 class ExamCreateRequest(BaseModel):
@@ -434,31 +434,7 @@ def get_card_heatmap(user_id: str = Query(..., description="Scholar ID")):
         conn.close()
 
 
-# --- Dev-Only Utility Endpoints ---
 
-@router.post("/api/dev/advance-days")
-def dev_advance_days(payload: AdvanceDaysRequest):
-    """Dev-only: Shift the simulated date offset to test due dates."""
-    new_today = srs.advance_days(payload.days)
-    return {
-        "status": "success",
-        "days_advanced": payload.days,
-        "offset": srs.DEV_DAY_OFFSET,
-        "today": new_today
-    }
-
-
-@router.post("/api/dev/reset-cards")
-def dev_reset_cards(payload: ResetCardsRequest):
-    """Dev-only: Reset all card_state and review_log records for a user."""
-    conn = get_db_connection()
-    try:
-        conn.execute("DELETE FROM card_state WHERE user_id = ?", (payload.user_id,))
-        conn.execute("DELETE FROM review_log WHERE user_id = ?", (payload.user_id,))
-        conn.commit()
-        return {"status": "success", "user_id": payload.user_id, "message": "Cards progress reset."}
-    finally:
-        conn.close()
 
 
 @router.post("/api/exams")

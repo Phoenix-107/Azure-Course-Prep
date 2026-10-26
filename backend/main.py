@@ -7,19 +7,21 @@ and dashboard readiness analytics. Serves frontend static assets.
 import json
 import random
 import time
+import os
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException, Path as PathParameter, Query
+from fastapi import Depends, FastAPI, HTTPException, Path as PathParameter, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.db import get_db_connection, init_db
 from backend.cards_router import router as cards_router
+from backend.dev_router import router as dev_router, verify_admin_secret
 from backend import srs
 from backend.readiness import (
     build_day_plan,
@@ -34,10 +36,22 @@ from backend.readiness import (
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 
+# Environment Detection & Security Configuration
+ENV = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
+IS_PRODUCTION = ENV in ("production", "prod")
+
+# Disable Swagger & OpenAPI documentation in production to prevent information leakage
+docs_url = None if IS_PRODUCTION else "/docs"
+redoc_url = None if IS_PRODUCTION else "/redoc"
+openapi_url = None if IS_PRODUCTION else "/openapi.json"
+
 app = FastAPI(
     title="Azure Scholar AZ-900 API",
     description="Backend API for Azure AZ-900 Preparation Platform",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=docs_url,
+    redoc_url=redoc_url,
+    openapi_url=openapi_url,
 )
 
 # Enable CORS for local client development
@@ -49,8 +63,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register Flashcards Coach router
+# Register core application routers
 app.include_router(cards_router)
+
+# Conditionally isolate development utilities:
+# - In local/dev: mounted freely for test automation and debugging
+# - In production: completely excluded by default
+# - In staging/controlled environments (ENABLE_DEV_ENDPOINTS=true): strictly guarded by admin authentication
+ENABLE_DEV_ENDPOINTS = os.getenv("ENABLE_DEV_ENDPOINTS", "false").lower() in ("true", "1")
+
+if not IS_PRODUCTION:
+    app.include_router(dev_router)
+elif ENABLE_DEV_ENDPOINTS:
+    app.include_router(dev_router, dependencies=[Depends(verify_admin_secret)])
+
 
 # In-memory session tracking for randomized question option orders
 # Key: (user_id, question_id) -> {"shuffled_to_orig": list[int], "orig_to_shuffled": list[int], "timestamp": float}
